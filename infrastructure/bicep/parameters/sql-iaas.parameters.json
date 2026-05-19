@@ -1,0 +1,45 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "deploymentType": {
+      "value": "IaaS"
+    },
+    "location": {
+      "value": "eastus"
+    },
+    "resourceGroupName": {
+      "value": "rg-defender-sql-iaas-test"
+    },
+    "vmName": {
+      "value": "sqlvmtest01"
+    },
+    "vmSize": {
+      "value": "Standard_D4s_v5"
+    },
+    "adminUsername": {
+      "value": "azureadmin"
+    },
+    "adminPassword": {
+      "value": "<replace-with-secure-vm-admin-password>"
+    },
+    "sqlAuthUsername": {
+      "value": "sqltestadmin"
+    },
+    "sqlAuthPassword": {
+      "value": "<replace-with-secure-sql-auth-password>"
+    },
+    "serverName": {
+      "value": "sqlpaasplaceholder01"
+    },
+    "databaseName": {
+      "value": "sqldbplaceholder01"
+    },
+    "adminLogin": {
+      "value": "sqladminuser"
+    },
+    "adminLoginPassword": {
+      "value": "<replace-with-secure-sql-server-password>"
+    }
+  }
+}

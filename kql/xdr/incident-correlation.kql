@@ -1,0 +1,53 @@
+// Purpose: Correlate SQL-related Defender for Cloud alerts into likely incidents in Microsoft Defender XDR.
+// Table schema focus: AlertInfo(Timestamp, AlertId, Title, Severity, Category, ServiceSource) joined with AlertEvidence(AlertId, EntityType, IPAddress, AccountName, AccountUpn, DeviceName, AzureResourceId).
+// Adjust the time range and correlation window below before running.
+
+let timeRange = 7d;
+let correlationWindow = 6h;
+let sqlAlerts =
+    AlertInfo
+    | where Timestamp >= ago(timeRange)
+    | where ServiceSource contains "Defender for Cloud"
+    | where Title contains "SQL" or Category contains "SQL" or AttackTechniques contains "SQL"
+    | project AlertId, Timestamp, Title, Severity, Category, AttackTechniques;
+let sqlEntities =
+    AlertEvidence
+    | where Timestamp >= ago(timeRange)
+    | extend EntityValue = coalesce(
+        tostring(column_ifexists("IPAddress", "")),
+        tostring(column_ifexists("AccountUpn", "")),
+        tostring(column_ifexists("AccountName", "")),
+        tostring(column_ifexists("AzureResourceId", "")),
+        tostring(column_ifexists("DeviceName", ""))
+      )
+    | where EntityValue != ""
+    | project AlertId, EntityType, EntityValue;
+let alertEntities =
+    sqlAlerts
+    | join kind=inner sqlEntities on AlertId
+    | project AlertId, Timestamp, Title, Severity, Category, AttackTechniques, EntityType, EntityValue;
+let correlatedPairs =
+    alertEntities
+    | join kind=inner (
+        alertEntities
+        | project CorrelatedAlertId = AlertId, CorrelatedTimestamp = Timestamp, CorrelatedTitle = Title, CorrelatedSeverity = Severity, CorrelatedCategory = Category, CorrelatedTechniques = AttackTechniques, EntityType, EntityValue
+      ) on EntityType, EntityValue
+    | where AlertId != CorrelatedAlertId
+    | where CorrelatedTimestamp between (Timestamp - correlationWindow .. Timestamp + correlationWindow)
+    | project Timestamp, AlertId, Title, Severity, Category, AttackTechniques, EntityType, EntityValue, CorrelatedTimestamp, CorrelatedAlertId, CorrelatedTitle, CorrelatedSeverity, CorrelatedCategory, CorrelatedTechniques;
+
+// Variation 1: Potential incidents grouped by overlapping entity and time window.
+correlatedPairs
+| summarize
+    RelatedAlerts = dcount(CorrelatedAlertId),
+    FirstSeen = min(Timestamp),
+    LastSeen = max(CorrelatedTimestamp),
+    AlertTitles = make_set(Title, 20),
+    CorrelatedTitles = make_set(CorrelatedTitle, 20),
+    AttackChainTechniques = make_set(AttackTechniques, 20)
+  by EntityType, EntityValue
+| order by LastSeen desc;
+
+// Variation 2: Detailed attack-chain candidates.
+// correlatedPairs
+// | order by EntityValue asc, Timestamp asc;

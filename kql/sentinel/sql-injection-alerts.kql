@@ -1,0 +1,61 @@
+// Purpose: Investigate SQL injection and SQL injection vulnerability alerts in Microsoft Sentinel.
+// Table schema focus: SecurityAlert(TimeGenerated, AlertType, AlertName, AlertSeverity, Description, ResourceId, ExtendedProperties, Tactics, Status).
+// Adjust the time range below before running.
+
+let timeRange = 7d;
+let sqlInjectionAlerts =
+    SecurityAlert
+    | where TimeGenerated >= ago(timeRange)
+    | where AlertType matches regex @"^SQL\..*(PotentialSqlInjection|VulnerabilityToSqlInjection)$"
+    | extend ExtendedPropertiesBag = todynamic(ExtendedProperties)
+    | extend
+        AffectedDatabase = coalesce(
+            tostring(ExtendedPropertiesBag.DatabaseName),
+            tostring(ExtendedPropertiesBag.Database),
+            tostring(ExtendedPropertiesBag.DatabaseFullName),
+            tostring(ExtendedPropertiesBag.SqlDatabaseName)
+        ),
+        VulnerableStatement = coalesce(
+            tostring(ExtendedPropertiesBag.VulnerableStatement),
+            tostring(ExtendedPropertiesBag.Statement),
+            tostring(ExtendedPropertiesBag.QueryText),
+            tostring(ExtendedPropertiesBag.SuspectStatement)
+        ),
+        AttackPattern = coalesce(
+            tostring(ExtendedPropertiesBag.AttackPattern),
+            tostring(ExtendedPropertiesBag.Payload),
+            tostring(ExtendedPropertiesBag.Technique),
+            tostring(ExtendedPropertiesBag.Evidence)
+        ),
+        MitreTactics = iff(isempty(Tactics), tostring(ExtendedPropertiesBag.MitreTactics), tostring(Tactics))
+    | project
+        TimeGenerated,
+        AlertName,
+        AlertType,
+        AlertSeverity,
+        AffectedDatabase,
+        VulnerableStatement,
+        AttackPattern,
+        MitreTactics,
+        Description,
+        ResourceId,
+        Status;
+
+// Variation 1: Detailed SQL injection alert view.
+sqlInjectionAlerts
+| order by TimeGenerated desc;
+
+// Variation 2: Summarize by affected database and pattern.
+// sqlInjectionAlerts
+// | summarize
+//     Alerts = count(),
+//     LatestAlert = max(TimeGenerated),
+//     AlertNames = make_set(AlertName),
+//     Tactics = make_set(MitreTactics)
+//   by AffectedDatabase, AttackPattern
+// | order by LatestAlert desc;
+
+// Variation 3: Count of injection-related alerts by MITRE tactic.
+// sqlInjectionAlerts
+// | summarize Alerts = count() by MitreTactics, AlertSeverity
+// | order by Alerts desc;

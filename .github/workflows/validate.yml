@@ -1,0 +1,49 @@
+name: Validate Scripts and Templates
+
+on:
+  push:
+    branches: [master, main]
+  pull_request:
+    branches: [master, main]
+
+jobs:
+  validate-powershell:
+    name: PowerShell Syntax Check
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Parse all PowerShell scripts
+        shell: pwsh
+        run: |
+          $hasErrors = $false
+          Get-ChildItem -Recurse -Filter *.ps1 | ForEach-Object {
+            $tokens = $null
+            $errors = $null
+            $null = [System.Management.Automation.Language.Parser]::ParseFile(
+              $_.FullName, [ref]$tokens, [ref]$errors)
+            if ($errors.Count -gt 0) {
+              $hasErrors = $true
+              Write-Host "::error file=$($_.FullName)::$($errors.Count) parse error(s)"
+              $errors | ForEach-Object { Write-Host "  Line $($_.Extent.StartLineNumber): $($_.Message)" }
+            } else {
+              Write-Host "OK: $($_.Name)"
+            }
+          }
+          if ($hasErrors) { exit 1 }
+
+  validate-bicep:
+    name: Bicep Build Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Bicep CLI
+        run: |
+          az bicep install
+          az bicep version
+
+      - name: Build Bicep templates
+        run: |
+          az bicep build --file infrastructure/bicep/main.bicep
+          az bicep build --file arc-enabled/infrastructure/bicep/main.bicep

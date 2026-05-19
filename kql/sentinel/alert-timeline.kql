@@ -1,0 +1,29 @@
+// Purpose: Visualize Defender for SQL alert activity over time in Microsoft Sentinel.
+// Table schema focus: SecurityAlert(TimeGenerated, ProviderName, AlertType, AlertSeverity, AlertName, Status).
+// Adjust the time range and bin size below before running.
+
+let timeRange = 7d;
+let chartBin = 1h;
+let sqlAlertTimeline =
+    SecurityAlert
+    | where TimeGenerated >= ago(timeRange)
+    | where ProviderName contains "SQL" or AlertType startswith "SQL"
+    | project TimeGenerated, AlertSeverity, AlertName, AlertType, Status;
+
+// Variation 1: Hourly alert volume by severity.
+sqlAlertTimeline
+| summarize AlertCount = count() by bin(TimeGenerated, chartBin), AlertSeverity
+| order by TimeGenerated asc
+| render timechart;
+
+// Variation 2: Alert trend analysis with fitted line by severity.
+// sqlAlertTimeline
+// | make-series AlertCount = count() default = 0 on TimeGenerated from ago(timeRange) to now() step chartBin by AlertSeverity
+// | extend (RSquare, Slope, Variance, RVariance, Interception, TrendLine) = series_fit_line(AlertCount)
+// | project AlertSeverity, AlertCount, TrendLine
+// | render timechart;
+
+// Variation 3: Compare status volume over time.
+// sqlAlertTimeline
+// | summarize AlertCount = count() by bin(TimeGenerated, chartBin), Status
+// | render stackedareachart;

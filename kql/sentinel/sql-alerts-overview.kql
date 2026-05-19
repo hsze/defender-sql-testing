@@ -1,0 +1,34 @@
+// Purpose: Overview of Defender for SQL alerts in Microsoft Sentinel / Log Analytics.
+// Table schema focus: SecurityAlert(TimeGenerated, ProviderName, AlertType, AlertName, AlertSeverity, Description, ResourceId, Status, ExtendedProperties, Tactics).
+// Adjust the time range below before running.
+
+let timeRange = 7d;
+let sqlAlerts =
+    SecurityAlert
+    | where TimeGenerated >= ago(timeRange)
+    | where ProviderName contains "SQL" or AlertType startswith "SQL"
+    | extend ExtendedPropertiesBag = todynamic(ExtendedProperties)
+    | project
+        TimeGenerated,
+        AlertName,
+        AlertSeverity,
+        Description,
+        ResourceId,
+        Status,
+        AlertType,
+        ProviderName,
+        ExtendedPropertiesBag;
+
+// Variation 1: Detailed SQL alert stream.
+sqlAlerts
+| order by TimeGenerated desc;
+
+// Variation 2: Alert summary by name with latest occurrence.
+// sqlAlerts
+// | summarize AlertCount = count(), LatestAlertTime = max(TimeGenerated) by AlertName
+// | order by LatestAlertTime desc;
+
+// Variation 3: Severity breakdown for quick triage.
+// sqlAlerts
+// | summarize AlertCount = count() by AlertSeverity, AlertName
+// | order by AlertCount desc;

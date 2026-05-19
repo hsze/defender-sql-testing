@@ -1,0 +1,87 @@
+// Purpose: Deep-dive investigation of SQL-related Defender for Cloud alerts in Microsoft Defender XDR.
+// Table schema focus: AlertInfo(Timestamp, AlertId, Title, Description, Severity, Category, ServiceSource, AttackTechniques, AdditionalFields) joined with AlertEvidence(AlertId, EntityType, EvidenceRole, RemediationStatus, IPAddress, AccountName, AccountUpn, DeviceName, AzureResourceId, AdditionalFields).
+// Adjust the time range below before running.
+
+let timeRange = 7d;
+let sqlAlertInfo =
+    AlertInfo
+    | where Timestamp >= ago(timeRange)
+    | where ServiceSource contains "Defender for Cloud"
+    | where Title contains "SQL" or Category contains "SQL" or AttackTechniques contains "SQL"
+    | extend AlertAdditionalFields = todynamic(column_ifexists("AdditionalFields", "{}"))
+    | project
+        AlertTimestamp = Timestamp,
+        AlertId,
+        Title,
+        Description,
+        Severity,
+        Category,
+        AttackTechniques,
+        ServiceSource,
+        AlertAdditionalFields;
+let sqlAlertEvidence =
+    AlertEvidence
+    | where Timestamp >= ago(timeRange)
+    | extend EvidenceAdditionalFields = todynamic(column_ifexists("AdditionalFields", "{}"))
+    | extend
+        IOC_IP = tostring(column_ifexists("IPAddress", "")),
+        IOC_Account = coalesce(tostring(column_ifexists("AccountUpn", "")), tostring(column_ifexists("AccountName", ""))),
+        IOC_Process = tostring(column_ifexists("ProcessCommandLine", "")),
+        IOC_Device = tostring(column_ifexists("DeviceName", "")),
+        IOC_Resource = tostring(column_ifexists("AzureResourceId", ""))
+    | project
+        EvidenceTimestamp = Timestamp,
+        AlertId,
+        EntityType,
+        EvidenceRole,
+        EvidenceDirection,
+        RemediationStatus,
+        IOC_IP,
+        IOC_Account,
+        IOC_Process,
+        IOC_Device,
+        IOC_Resource,
+        EvidenceAdditionalFields;
+
+// Variation 1: Full alert details with parsed evidence and IOC extraction.
+sqlAlertInfo
+| join kind=leftouter sqlAlertEvidence on AlertId
+| project
+    AlertTimestamp,
+    EvidenceTimestamp,
+    AlertId,
+    Title,
+    Description,
+    Severity,
+    Category,
+    AttackTechniques,
+    EntityType,
+    EvidenceRole,
+    EvidenceDirection,
+    RemediationStatus,
+    IOC_IP,
+    IOC_Account,
+    IOC_Process,
+    IOC_Device,
+    IOC_Resource,
+    AlertAdditionalFields,
+    EvidenceAdditionalFields
+| order by AlertTimestamp desc, EvidenceTimestamp asc;
+
+// Variation 2: Alert evidence timeline.
+// sqlAlertInfo
+// | join kind=leftouter sqlAlertEvidence on AlertId
+// | project AlertId, Title, Severity, AlertTimestamp, EvidenceTimestamp, EntityType, EvidenceRole, IOC_IP, IOC_Account, IOC_Process, IOC_Device, IOC_Resource
+// | order by AlertId asc, EvidenceTimestamp asc;
+
+// Variation 3: IOC summary for pivoting into other hunts.
+// sqlAlertInfo
+// | join kind=leftouter sqlAlertEvidence on AlertId
+// | summarize
+//     IPs = make_set_if(IOC_IP, IOC_IP != "", 50),
+//     Accounts = make_set_if(IOC_Account, IOC_Account != "", 50),
+//     Processes = make_set_if(IOC_Process, IOC_Process != "", 50),
+//     Devices = make_set_if(IOC_Device, IOC_Device != "", 50),
+//     Resources = make_set_if(IOC_Resource, IOC_Resource != "", 50)
+//   by AlertId, Title, Severity, Category
+// | order by Severity desc;

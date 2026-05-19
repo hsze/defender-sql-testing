@@ -1,0 +1,66 @@
+// Purpose: Review anomaly-based Defender for SQL alerts in Microsoft Sentinel.
+// Table schema focus: SecurityAlert(TimeGenerated, AlertType, AlertName, AlertSeverity, Description, ResourceId, ExtendedProperties, Status, CompromisedEntity).
+// Adjust the time range below before running.
+
+let timeRange = 7d;
+let anomalyAlerts =
+    SecurityAlert
+    | where TimeGenerated >= ago(timeRange)
+    | where AlertType has_any ("PrincipalAnomaly", "DomainAnomaly", "GeoAnomaly", "DataCenterAnomaly")
+    | extend ExtendedPropertiesBag = todynamic(ExtendedProperties)
+    | extend
+        AccountName = coalesce(
+            tostring(ExtendedPropertiesBag.AccountName),
+            tostring(ExtendedPropertiesBag.UserName),
+            tostring(ExtendedPropertiesBag.LoginName),
+            tostring(CompromisedEntity)
+        ),
+        SourceIp = coalesce(
+            tostring(ExtendedPropertiesBag.SourceIpAddress),
+            tostring(ExtendedPropertiesBag.ClientIpAddress),
+            tostring(ExtendedPropertiesBag.AttackerIpAddress)
+        ),
+        Country = coalesce(
+            tostring(ExtendedPropertiesBag.Country),
+            tostring(ExtendedPropertiesBag.CountryCode),
+            tostring(ExtendedPropertiesBag.GeoLocation)
+        ),
+        Region = coalesce(
+            tostring(ExtendedPropertiesBag.Region),
+            tostring(ExtendedPropertiesBag.State),
+            tostring(ExtendedPropertiesBag.Location)
+        ),
+        City = tostring(ExtendedPropertiesBag.City),
+        AnomalyDetails = coalesce(
+            tostring(ExtendedPropertiesBag.AnomalyType),
+            tostring(ExtendedPropertiesBag.Description),
+            tostring(ExtendedPropertiesBag.Evidence),
+            Description
+        )
+    | project
+        TimeGenerated,
+        AlertName,
+        AlertType,
+        AlertSeverity,
+        AccountName,
+        SourceIp,
+        Country,
+        Region,
+        City,
+        AnomalyDetails,
+        ResourceId,
+        Status;
+
+// Variation 1: Detailed anomaly timeline.
+anomalyAlerts
+| order by TimeGenerated desc;
+
+// Variation 2: Geographic view of unusual login patterns.
+// anomalyAlerts
+// | summarize Alerts = count(), Accounts = make_set(AccountName), LatestAlert = max(TimeGenerated) by Country, Region, City, SourceIp
+// | order by Alerts desc, LatestAlert desc;
+
+// Variation 3: Timeline of anomalous activity by alert type.
+// anomalyAlerts
+// | summarize Alerts = count() by bin(TimeGenerated, 1h), AlertType
+// | render timechart;

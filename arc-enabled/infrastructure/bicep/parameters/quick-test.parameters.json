@@ -1,0 +1,15 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "deploymentMode": { "value": "quick-test" },
+    "location": { "value": "eastus" },
+    "resourceGroupName": { "value": "rg-arc-sql-quicktest" },
+    "vmName": { "value": "sql-arc-quicktest" },
+    "vmSize": { "value": "Standard_D4s_v3" },
+    "adminUsername": { "value": "azureadmin" },
+    "adminPassword": { "value": "<REPLACE>" },
+    "sqlAuthUsername": { "value": "sqltester" },
+    "sqlAuthPassword": { "value": "<REPLACE>" }
+  }
+}

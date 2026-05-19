@@ -1,0 +1,13 @@
+{
+  "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentParameters.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "deploymentMode": { "value": "nested-hyperv" },
+    "location": { "value": "eastus" },
+    "resourceGroupName": { "value": "rg-arc-sql-test" },
+    "vmName": { "value": "arc-hyperv-host" },
+    "vmSize": { "value": "Standard_D8s_v3" },
+    "adminUsername": { "value": "azureadmin" },
+    "adminPassword": { "value": "<REPLACE>" }
+  }
+}

@@ -1,0 +1,67 @@
+// Purpose: Investigate Defender for SQL brute-force alerts in Microsoft Sentinel.
+// Table schema focus: SecurityAlert(TimeGenerated, AlertType, AlertName, AlertSeverity, Status, ExtendedProperties, ResourceId, Description).
+// Adjust the time range below before running.
+
+let timeRange = 7d;
+let bruteForceAlerts =
+    SecurityAlert
+    | where TimeGenerated >= ago(timeRange)
+    | where AlertType in~ ("SQL.VM_BruteForce", "SQL.DB_BruteForce")
+    | extend ExtendedPropertiesBag = todynamic(ExtendedProperties)
+    | extend
+        AttackerIp = coalesce(
+            tostring(ExtendedPropertiesBag.AttackerIpAddress),
+            tostring(ExtendedPropertiesBag.AttackerIP),
+            tostring(ExtendedPropertiesBag.ClientIpAddress),
+            tostring(ExtendedPropertiesBag.RemoteIpAddress),
+            tostring(ExtendedPropertiesBag.SourceIpAddress)
+        ),
+        TargetAccount = coalesce(
+            tostring(ExtendedPropertiesBag.TargetAccount),
+            tostring(ExtendedPropertiesBag.TargetUserName),
+            tostring(ExtendedPropertiesBag.LoginName),
+            tostring(ExtendedPropertiesBag.AccountName),
+            tostring(ExtendedPropertiesBag.UserName)
+        ),
+        FailedAttemptCount = toint(coalesce(
+            tostring(ExtendedPropertiesBag.FailedAttemptCount),
+            tostring(ExtendedPropertiesBag.FailedLogins),
+            tostring(ExtendedPropertiesBag.AttemptCount),
+            "0"
+        )),
+        RemediationStatus = coalesce(
+            tostring(ExtendedPropertiesBag.RemediationStatus),
+            tostring(ExtendedPropertiesBag.RemediationState),
+            Status
+        )
+    | project
+        TimeGenerated,
+        AlertName,
+        AlertType,
+        AlertSeverity,
+        AttackerIp,
+        TargetAccount,
+        FailedAttemptCount,
+        RemediationStatus,
+        Status,
+        Description,
+        ResourceId;
+
+// Variation 1: Detailed brute-force alerts ordered by recency.
+bruteForceAlerts
+| order by TimeGenerated desc;
+
+// Variation 2: Aggregate by attacker IP and target account.
+// bruteForceAlerts
+// | summarize
+//     Alerts = count(),
+//     TotalFailedAttempts = sum(FailedAttemptCount),
+//     LatestAlert = max(TimeGenerated),
+//     Severities = make_set(AlertSeverity)
+//   by AttackerIp, TargetAccount, RemediationStatus
+// | order by LatestAlert desc;
+
+// Variation 3: Hourly brute-force activity trend.
+// bruteForceAlerts
+// | summarize Alerts = count(), FailedAttempts = sum(FailedAttemptCount) by bin(TimeGenerated, 1h), AlertType
+// | render timechart;

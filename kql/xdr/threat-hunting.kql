@@ -1,0 +1,45 @@
+// Purpose: Proactive hunting for SQL attack indicators in Microsoft Defender XDR.
+// Table schema focus: CloudAppEvents(Timestamp, ActionType, Application, AccountDisplayName, IPAddress, RawEventData, AdditionalFields) plus AlertInfo/AlertEvidence for pivoting.
+// Adjust the time range below before running.
+
+// Query 1: Database access and login activity from CloudAppEvents.
+let timeRange = 7d;
+CloudAppEvents
+| where Timestamp >= ago(timeRange)
+| extend RawData = tostring(column_ifexists("RawEventData", "")), AdditionalFieldsText = tostring(column_ifexists("AdditionalFields", ""))
+| where ActionType has_any ("Login", "Logon", "Query", "Execute", "Connect")
+    or Application has_any ("SQL", "Azure SQL", "Database")
+    or RawData has_any ("sql", "database", "query")
+    or AdditionalFieldsText has_any ("sql", "database", "query")
+| project Timestamp, ActionType, Application, AccountDisplayName, IPAddress, RawData, AdditionalFieldsText
+| order by Timestamp desc;
+
+// Query 2: Possible brute-force style activity by IP and account.
+// let timeRange = 7d;
+// CloudAppEvents
+// | where Timestamp >= ago(timeRange)
+// | where ActionType has_any ("LoginFailed", "LogonFailed", "FailedLogin", "AuthenticationFailed")
+// | summarize FailedAttempts = count(), FirstSeen = min(Timestamp), LastSeen = max(Timestamp) by IPAddress, AccountDisplayName, Application
+// | where FailedAttempts >= 5
+// | order by FailedAttempts desc;
+
+// Query 3: Suspicious SQL query content that may indicate injection.
+// let timeRange = 7d;
+// CloudAppEvents
+// | where Timestamp >= ago(timeRange)
+// | extend RawData = tostring(column_ifexists("RawEventData", "")), AdditionalFieldsText = tostring(column_ifexists("AdditionalFields", ""))
+// | where RawData matches regex @"(?i)(union\s+select|or\s+1=1|xp_cmdshell|information_schema|drop\s+table|waitfor\s+delay)"
+//     or AdditionalFieldsText matches regex @"(?i)(union\s+select|or\s+1=1|xp_cmdshell|information_schema|drop\s+table|waitfor\s+delay)"
+// | project Timestamp, Application, AccountDisplayName, IPAddress, RawData, AdditionalFieldsText
+// | order by Timestamp desc;
+
+// Query 4: Privilege escalation indicators around role or permission changes.
+// let timeRange = 7d;
+// CloudAppEvents
+// | where Timestamp >= ago(timeRange)
+// | extend RawData = tostring(column_ifexists("RawEventData", "")), AdditionalFieldsText = tostring(column_ifexists("AdditionalFields", ""))
+// | where ActionType has_any ("Add member to role", "Grant permission", "RoleAssigned", "PrivilegeEscalation")
+//     or RawData has_any ("GRANT", "ALTER ROLE", "sp_addsrvrolemember", "db_owner")
+//     or AdditionalFieldsText has_any ("GRANT", "ALTER ROLE", "sp_addsrvrolemember", "db_owner")
+// | project Timestamp, ActionType, Application, AccountDisplayName, IPAddress, RawData, AdditionalFieldsText
+// | order by Timestamp desc;

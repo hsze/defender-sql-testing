@@ -1,0 +1,37 @@
+// Purpose: Overview of SQL-related Defender for Cloud alerts in Microsoft Defender XDR Advanced Hunting.
+// Table schema focus: AlertInfo(Timestamp, AlertId, Title, Severity, Category, ServiceSource, AttackTechniques) joined with AlertEvidence(AlertId, EntityType, EvidenceRole, IPAddress, AccountName, DeviceName, AzureResourceId).
+// Adjust the time range below before running.
+
+let timeRange = 7d;
+let sqlAlertInfo =
+    AlertInfo
+    | where Timestamp >= ago(timeRange)
+    | where ServiceSource contains "Defender for Cloud"
+    | where Title contains "SQL" or Category contains "SQL" or AttackTechniques contains "SQL"
+    | project Timestamp, AlertId, Title, Severity, Category, AttackTechniques, ServiceSource;
+let evidenceSummary =
+    AlertEvidence
+    | where Timestamp >= ago(timeRange)
+    | extend EntityValue = coalesce(
+        tostring(column_ifexists("IPAddress", "")),
+        tostring(column_ifexists("AccountUpn", "")),
+        tostring(column_ifexists("AccountName", "")),
+        tostring(column_ifexists("AzureResourceId", "")),
+        tostring(column_ifexists("DeviceName", ""))
+      )
+    | summarize
+        EvidenceCount = count(),
+        Entities = make_set_if(EntityValue, EntityValue != "", 20),
+        EntityTypes = make_set(EntityType, 20)
+      by AlertId;
+
+// Variation 1: Enriched SQL alert overview.
+sqlAlertInfo
+| join kind=leftouter evidenceSummary on AlertId
+| project Timestamp, Title, Severity, Category, AttackTechniques, EvidenceCount, Entities, EntityTypes, AlertId
+| order by Timestamp desc;
+
+// Variation 2: Summary by title and severity.
+// sqlAlertInfo
+// | summarize Alerts = count(), LatestAlert = max(Timestamp) by Title, Severity, Category
+// | order by LatestAlert desc;

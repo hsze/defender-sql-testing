@@ -1,0 +1,40 @@
+# PowerShell
+*.ps1xml
+*.psd1.bak
+
+# Bicep
+*.json.bak
+
+# Azure
+.azure/
+azuredeploy.parameters.local.json
+
+# Secrets and credentials
+*.pfx
+*.cer
+*.key
+secrets.json
+local.settings.json
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.user
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.tmp
+*.temp
+.temp/
+
+# Output
+output/
+results/
