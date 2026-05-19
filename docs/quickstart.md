@@ -81,7 +81,7 @@ This single command:
 3. Switches SQL Server to Mixed Mode authentication and opens TCP 1433.
 4. Runs `Initialize-SqlLogins.ps1` on the VM to bootstrap SQL logins via single-user mode.
 
-> Wait ~5 minutes after deployment for the Defender ATP extension and Azure Monitor Agent to fully provision.
+> Wait ~5 minutes after deployment for the Defender for SQL extension to fully provision.
 
 ### Verify deployment
 
@@ -194,10 +194,10 @@ For testing with Arc-connected machines (simulating on-prem), see [arc-enabled/R
 | Issue | Likely cause | Fix |
 |---|---|---|
 | `AUTH_FAIL` on all attacks except BruteForce | SQL login doesn't exist | Re-run `Initialize-SqlLogins.ps1` via `Invoke-AzVMRunCommand` |
-| Simulator exe not found | Defender ATP extension not installed | Wait 5 min; check extensions on VM |
+| Simulator exe not found | Defender for SQL extension not installed | Wait 5 min; check extensions on VM |
 | "connection error 25" | Named instance mismatch | Omit `-InstanceName` for default instance |
 | Shell scenarios say "disabled on server" | `xp_cmdshell` off (expected) | Alerts still generated; enable `xp_cmdshell` for full telemetry |
-| No alerts after 30 min | Defender plan not Standard, or AMA not connected | Check pricing tier and Azure Monitor Agent status |
+| No alerts after 30 min | Defender plan not Standard, or extension not healthy | Check pricing tier and extension status |
 | Initialize-SqlLogins fails | Service in bad state | Restart the VM and re-run |
 
 See also: main [README troubleshooting](../README.md#troubleshooting).

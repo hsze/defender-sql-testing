@@ -284,7 +284,7 @@ try {
             try {
                 $null = Set-AzVMExtension @extensionSplat
             } catch {
-                Write-Warning "Legacy 'SqlAdvancedThreatProtection' extension is no longer published. Skipping. Defender for SQL on machines is enabled via the pricing plan + Azure Monitor Agent. Error: $($_.Exception.Message)"
+                Write-Warning "Legacy 'SqlAdvancedThreatProtection' extension is no longer published. Skipping. Defender for SQL on machines is enabled via the pricing plan + Defender for SQL extension. Error: $($_.Exception.Message)"
             }
         }
         else {

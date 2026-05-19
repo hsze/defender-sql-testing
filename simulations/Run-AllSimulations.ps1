@@ -1,7 +1,7 @@
 # Run-AllSimulations.ps1
 # Runs Defender for SQL on Machines attack scenarios against a SQL VM using the
 # Microsoft simulator binary (Microsoft.SQL.ADS.DefenderForSQL.exe) that ships
-# with the Defender for SQL ATP extension.
+# with the Defender for SQL extension.
 #
 # Each scenario is invoked on the VM via Invoke-AzVMRunCommand. Credentials must
 # be for an EXISTING SQL login (otherwise every scenario except BruteForce fails

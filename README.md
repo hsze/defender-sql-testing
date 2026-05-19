@@ -1,6 +1,6 @@
 # Defender for SQL — Alert Validation Lab
 
-A turnkey lab for generating and validating **Microsoft Defender for SQL** alerts. The primary track drives the Microsoft-supplied simulator that ships with the Defender for SQL ATP extension on **SQL on Azure VM (IaaS)** and **Arc-enabled SQL Server**. A secondary track is provided for **Azure SQL Database (PaaS)**, where the on-machine simulator does **not** apply.
+A turnkey lab for generating and validating **Microsoft Defender for SQL** alerts. The primary track drives the Microsoft-supplied simulator that ships with the Defender for SQL extension on **SQL on Azure VM (IaaS)** and **Arc-enabled SQL Server**. A secondary track is provided for **Azure SQL Database (PaaS)**, where the on-machine simulator does **not** apply.
 
 ## End-to-end flow
 
@@ -117,7 +117,7 @@ What this does:
 - Switches SQL Server to Mixed Mode authentication and opens TCP 1433.
 - Calls [`simulations/Initialize-SqlLogins.ps1`](simulations/Initialize-SqlLogins.ps1) on the VM to bootstrap SQL logins via single-user mode.
 
-> Wait ~5 minutes after deployment for the Defender for SQL ATP extension and Azure Monitor Agent to fully provision before running simulations.
+> Wait ~5 minutes after deployment for the Defender for SQL extension to fully provision before running simulations.
 
 ### 2. Run all 7 simulator scenarios
 
@@ -213,7 +213,7 @@ SecurityAlert
 - **No alerts after 30 min** — confirm:
   1. The Defender for SQL on machines **pricing plan** is `Standard` (`Get-AzSecurityPricing -Name SqlServerVirtualMachines`).
   2. The VM has the `AzureDefenderForSQL.AdvancedThreatProtection.Windows` extension installed and `Protected` status.
-  3. The Azure Monitor Agent is installed and connected to the Sentinel workspace.
+  3. The Defender for SQL extension is installed and showing `Protected` status.
 - **`Initialize-SqlLogins.ps1` fails to put SQL into single-user mode** — typically a previous run left the service in a bad state. Restart the VM and re-run.
 
 ## Arc-enabled track
