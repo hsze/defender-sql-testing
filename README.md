@@ -115,12 +115,7 @@ What this does:
 - Creates the resource group, VNet, NSG (RDP + 1433), and a Windows Server 2022 VM running SQL Server 2022 Developer.
 - Registers the SQL IaaS extension and enables the **Defender for SQL on machines** pricing plan.
 - Switches SQL Server to Mixed Mode authentication and opens TCP 1433.
-- Calls [`simulations/Initialize-SqlLogins.ps1`](simulations/Initialize-SqlLogins.ps1) on the VM, which:
-  - Restarts SQL in single-user mode so the bootstrap connection is auto-granted `sysadmin`.
-  - Grants `NT AUTHORITY\SYSTEM` and `BUILTIN\Administrators` the `sysadmin` role (so future `Invoke-AzVMRunCommand` calls can manage SQL).
-  - Enables `sa` with the supplied password.
-  - Creates the requested SQL login (default name `sqltester`) as a sysadmin.
-  - Creates a secondary `heather` sysadmin login used by some simulator scenarios.
+- Calls [`simulations/Initialize-SqlLogins.ps1`](simulations/Initialize-SqlLogins.ps1) on the VM to bootstrap SQL logins via single-user mode.
 
 > Wait ~5 minutes after deployment for the Defender for SQL ATP extension and Azure Monitor Agent to fully provision before running simulations.
 
