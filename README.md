@@ -14,19 +14,19 @@ A turnkey lab for generating and validating **Microsoft Defender for SQL** alert
 
  --- SIMULATOR TRACK (Defender for SQL on Machines) ---
 
- +---------------------------+        +-------------------------+      +-------------------------+    +--------------------------+
- | Option A: SQL on Azure VM |\       | Run-AllSimulations.ps1  |      | Sentinel (SecurityAlert)|    | Remove-Resources.ps1     |
- | (IaaS)                    | \      | drives 7 scenarios via  |----->|  kql/sentinel/*.kql     |--->| or                       |
- | Deploy-SqlIaas.ps1        |  \---->| Microsoft.SQL.ADS.      |      | Defender XDR (AlertInfo)|    | Remove-ArcResources.ps1  |
- +---------------------------+   |    | DefenderForSQL.exe      |      |  kql/xdr/*.kql          |    +--------------------------+
-                                 |    |  - BruteForce           |      +-------------------------+
- +---------------------------+   |    |  - SqlInjection         |
- | Option B: Arc-enabled SQL |---|    |  - LoginSuspiciousApp   |
- | (on-prem / nested Hyper-V)|        |  - PrincipalAnomaly     |
- | arc-enabled/*             |        |  - ShellExternalSrcAnom |
- +---------------------------+        |  - ShellObfuscation     |
-                                      |  - DataExfiltration     |
-                                      +-------------------------+
+ +---------------------------+        +-----------------------------+      +-------------------------+    +--------------------------+
+ | Option A: SQL on Azure VM |\       | Run-AllIaaSSimulations.ps1  |      | Sentinel (SecurityAlert)|    | Remove-Resources.ps1     |
+ | (IaaS)                    | \      | drives 7 scenarios via      |----->|  kql/sentinel/*.kql     |--->| or                       |
+ | Deploy-SqlIaas.ps1        |  \---->| Microsoft.SQL.ADS.          |      | Defender XDR (AlertInfo)|    | Remove-ArcResources.ps1  |
+ +---------------------------+   |    | DefenderForSQL.exe          |      |  kql/xdr/*.kql          |    +--------------------------+
+                                 |    |  - BruteForce               |      +-------------------------+
+ +---------------------------+   |    |  - SqlInjection             |
+ | Option B: Arc-enabled SQL |---|    |  - LoginSuspiciousApp       |
+ | (on-prem / nested Hyper-V)|        |  - PrincipalAnomaly         |
+ | arc-enabled/*             |        |  - ShellExternalSrcAnom     |
+ +---------------------------+        |  - ShellObfuscation         |
+                                      |  - DataExfiltration         |
+                                      +-----------------------------+
 
  --- PAAS TRACK (Defender for Azure SQL Databases) — separate alert pipeline ---
 
@@ -70,7 +70,7 @@ defender-sql-testing/
 ├── arc-enabled/                        # SIMULATOR TRACK: Arc-connected SQL Servers (on-prem / nested Hyper-V)
 ├── simulations/
 │   ├── Initialize-SqlLogins.ps1        # Bootstraps SQL logins via single-user mode (machines track)
-│   ├── Run-AllSimulations.ps1          # Runs all 7 simulator scenarios via Invoke-AzVMRunCommand (IaaS/Arc)
+│   ├── Run-AllIaaSSimulations.ps1          # Runs all 7 simulator scenarios via Invoke-AzVMRunCommand (IaaS/Arc)
 │   └── Run-PaasSimulations.ps1         # Client-side alert simulation for Azure SQL Database (PaaS)
 ├── kql/
 │   ├── sentinel/                       # KQL for Sentinel / Log Analytics (SecurityAlert)
@@ -126,7 +126,7 @@ What this does:
 ### 2. Run all 7 simulator scenarios
 
 ```powershell
-.\simulations\Run-AllSimulations.ps1 `
+.\simulations\Run-AllIaaSSimulations.ps1 `
     -ResourceGroupName 'rg-defender-sql-test' `
     -VMName            'sqltestvm' `
     -SqlUser           'sqltester' `
@@ -159,7 +159,7 @@ DataExfiltration            OK     2026-05-19T05:14:52Z Successfully tested data
 Run a subset with `-Attacks`:
 
 ```powershell
-.\simulations\Run-AllSimulations.ps1 -RG 'rg-defender-sql-test' -VM 'sqltestvm' `
+.\simulations\Run-AllIaaSSimulations.ps1 -RG 'rg-defender-sql-test' -VM 'sqltestvm' `
     -SqlUser 'sqltester' -SqlPassword '<YourSqlPassword>' `
     -Attacks BruteForce,SqlInjection
 ```
@@ -184,17 +184,17 @@ SecurityAlert
 
 ## Attack catalog
 
-`Run-AllSimulations.ps1` drives the simulator binary's seven scenarios. Each maps to a Defender for SQL alert type:
+`Run-AllIaaSSimulations.ps1` drives the simulator binary's seven scenarios. Each maps to a Defender for SQL alert type:
 
 | Simulator scenario           | Defender alert type                                   | Requires SQL login | Notes |
 |------------------------------|-------------------------------------------------------|--------------------|-------|
-| `BruteForce`                 | `SQL.VM_BruteForce`                                   | No                 | Simulator iterates fake users — runs without `-u/-P`. |
-| `SqlInjection`               | `SQL.VM_PotentialSqlInjection`                        | Yes                | Connects with `-u/-P` and runs an injection-pattern query. |
-| `LoginSuspiciousApp`         | `SQL.VM_HarmfulApplication`                           | Yes                | Connects with a known-bad client `Application Name`. |
-| `PrincipalAnomaly`           | `SQL.VM_PrincipalAnomaly`                             | Yes                | Login from a principal not seen before. |
-| `ShellExternalSourceAnomaly` | `SQL.VM_ShellExternalSourceAnomaly`                   | Yes                | Reports "disabled on server" unless `xp_cmdshell` is enabled. |
-| `ShellObfuscation`           | `SQL.VM_ShellObfuscation`                             | Yes                | Reports "disabled on server" unless `xp_cmdshell` is enabled. |
-| `DataExfiltration`           | `SQL.VM_DataExfiltrationAnomaly`                      | Yes                | Large `SELECT` against system views. |
+| `BruteForce`                 | `SQL.VM_BruteForce`                                   | No                 | Simulator iterates fake users — runs without `-u/-P`. Signature-based: alert fires reliably. |
+| `SqlInjection`               | `SQL.VM_PotentialSqlInjection`                        | Yes                | Connects with `-u/-P` and runs an injection-pattern query. Signature-based: alert fires reliably. |
+| `LoginSuspiciousApp`         | `SQL.VM_HarmfulApplication`                           | Yes                | Connects with a known-bad client `Application Name`. Signature-based: alert fires reliably. |
+| `PrincipalAnomaly`           | `SQL.VM_PrincipalAnomaly`                             | Yes                | Anomaly-based: fires ONLY for a login that has never been seen on this instance. The wrapper auto-provisions a fresh `simprincipal_<guid>` login per run so this alert fires reliably. Pass `-SkipFreshPrincipal` to disable. |
+| `ShellExternalSourceAnomaly` | `SQL.VM_ShellExternalSourceAnomaly`                   | Yes                | Simulator reports "disabled on server" if `xp_cmdshell` is off, but the alert still fires. Signature-based. |
+| `ShellObfuscation`           | `SQL.VM_ShellObfuscationAnomaly`                      | Yes                | Same xp_cmdshell note as above. Signature-based. |
+| `DataExfiltration`           | `SQL.VM_DataExfiltrationAnomaly`                      | Yes                | **Baseline-gated anomaly detector.** Requires multi-day observed workload before the engine has a "normal query size" reference. **Will NOT fire on a fresh lab VM**; expect this one to stay red unless the instance has been running for ~7 days. |
 
 ## How the wrapper works (under the hood)
 
@@ -205,6 +205,9 @@ SecurityAlert
 
 ## Troubleshooting
 
+- **The wrapper printed `SIM_OK` for all 7 attacks but I only see 5 alert types in Sentinel.** That is expected. `SIM_OK` means the simulator binary on the VM exited 0 — it is a **client-side** confirmation only, not a confirmation that Defender raised an alert. Two scenarios are anomaly-based:
+  - `PrincipalAnomaly` fires only for a login that has never connected to this instance. The wrapper now auto-provisions a fresh `simprincipal_<guid>` SQL login for this run, so this scenario should alert reliably going forward.
+  - `DataExfiltrationAnomaly` is gated by a multi-day behavioral baseline of "normal" query result size. A freshly-deployed lab VM has no baseline, so this alert will not fire until the instance has been observed under a steady workload for ~7 days. There is no client-side trick that bypasses this.
 - **Every attack except `BruteForce` returns `AUTH_FAIL` / "Login failed for user"** — the SQL login passed to `-SqlUser` does not exist on the SQL instance. Re-run `Initialize-SqlLogins.ps1` (parameterized, idempotent):
   ```powershell
   Invoke-AzVMRunCommand -ResourceGroupName rg-defender-sql-test -VMName sqltestvm `
@@ -222,7 +225,7 @@ SecurityAlert
 
 ## Arc-enabled track
 
-For testing Defender for SQL on **Arc-connected machines** (simulating on-prem / hybrid), see [`arc-enabled/`](arc-enabled/). Once the Arc-connected SQL Server is registered and Defender for SQL is enabled, the same `Run-AllSimulations.ps1` workflow applies — point `-ResourceGroupName`/`-VMName` at the Arc machine resource. The simulator binary is delivered to Arc machines by the same Defender for SQL extension as for IaaS, so all 7 scenarios apply.
+For testing Defender for SQL on **Arc-connected machines** (simulating on-prem / hybrid), see [`arc-enabled/`](arc-enabled/). Once the Arc-connected SQL Server is registered and Defender for SQL is enabled, the same `Run-AllIaaSSimulations.ps1` workflow applies — point `-ResourceGroupName`/`-VMName` at the Arc machine resource. The simulator binary is delivered to Arc machines by the same Defender for SQL extension as for IaaS, so all 7 scenarios apply.
 
 ## Azure SQL Database (PaaS) track
 

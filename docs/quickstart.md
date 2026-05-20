@@ -101,7 +101,7 @@ Expected extensions: `SqlIaasExtension`, `MicrosoftDefenderforSQL` (or `Advanced
 Run all 7 attack scenarios using the Microsoft simulator binary:
 
 ```powershell
-.\simulations\Run-AllSimulations.ps1 `
+.\simulations\Run-AllIaaSSimulations.ps1 `
     -ResourceGroupName 'rg-defender-sql-test' `
     -VMName            'sqltestvm' `
     -SqlUser           'sqltester' `
@@ -111,7 +111,7 @@ Run all 7 attack scenarios using the Microsoft simulator binary:
 ### Run a subset
 
 ```powershell
-.\simulations\Run-AllSimulations.ps1 `
+.\simulations\Run-AllIaaSSimulations.ps1 `
     -ResourceGroupName 'rg-defender-sql-test' `
     -VMName            'sqltestvm' `
     -SqlUser           'sqltester' `
@@ -187,7 +187,7 @@ Get-AzResourceGroup -Name 'rg-defender-sql-test' -ErrorAction SilentlyContinue
 
 ## Arc-enabled SQL Server
 
-For testing with Arc-connected machines (simulating on-prem), see [arc-enabled/README.md](../arc-enabled/README.md). Once the Arc machine is set up, use the same `Run-AllSimulations.ps1` -- point `-ResourceGroupName`/`-VMName` at the Arc machine resource.
+For testing with Arc-connected machines (simulating on-prem), see [arc-enabled/README.md](../arc-enabled/README.md). Once the Arc machine is set up, use the same `Run-AllIaaSSimulations.ps1` -- point `-ResourceGroupName`/`-VMName` at the Arc machine resource.
 
 ## Troubleshooting
 

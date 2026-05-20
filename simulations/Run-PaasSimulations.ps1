@@ -8,7 +8,7 @@ WARNING: LAB USE ONLY. This script intentionally sends suspicious queries and
 failed logins to an Azure SQL Database to trigger Microsoft Defender for SQL
 alerts. Only run against isolated test databases. See SECURITY.md.
 
-Unlike the IaaS/Arc simulator track (Run-AllSimulations.ps1), there is no
+Unlike the IaaS/Arc simulator track (Run-AllIaaSSimulations.ps1), there is no
 on-machine simulator binary for PaaS. Instead, this script generates
 client-side activity patterns that Defender for SQL may detect:
 

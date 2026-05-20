@@ -38,6 +38,6 @@ Only the latest version on the `master` branch is actively maintained. There are
 ## Credential handling
 
 - Passwords are accepted as `[SecureString]` parameters in deployment scripts.
-- The simulation wrapper (`Run-AllSimulations.ps1`) accepts passwords as plain strings because they are passed to `Invoke-AzVMRunCommand -Parameter` and interpolated into remote scripts. This is a known limitation of the VM Run Command interface.
+- The simulation wrapper (`Run-AllIaaSSimulations.ps1`) accepts passwords as plain strings because they are passed to `Invoke-AzVMRunCommand -Parameter` and interpolated into remote scripts. This is a known limitation of the VM Run Command interface.
 - **Never commit passwords or secrets to this repository.**
 - The `.gitignore` excludes common secret file patterns (`secrets.json`, `*.key`, `*.pfx`, `local.settings.json`).

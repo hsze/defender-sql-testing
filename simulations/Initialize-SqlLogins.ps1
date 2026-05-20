@@ -16,7 +16,7 @@ the connecting principal is automatically granted sysadmin, then:
 
   - Grants NT AUTHORITY\SYSTEM and BUILTIN\Administrators the sysadmin role
   - Enables `sa` and sets its password to the provided value
-  - Creates the requested SQL login as sysadmin (used by Run-AllSimulations.ps1)
+  - Creates the requested SQL login as sysadmin (used by Run-AllIaaSSimulations.ps1)
   - Optionally creates the `heather` simulator login
 
 The script is designed to be executed ON THE VM (e.g. via Invoke-AzVMRunCommand).
