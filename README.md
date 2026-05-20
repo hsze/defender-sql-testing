@@ -31,11 +31,14 @@ A turnkey lab for generating and validating **Microsoft Defender for SQL** alert
  --- PAAS TRACK (Defender for Azure SQL Databases) — separate alert pipeline ---
 
  +---------------------------+        +-------------------------+      +-------------------------+
- | Option C: Azure SQL DB    |        | Client-driven query     |      | Same Sentinel / XDR     |
- | (PaaS)                    |------->| patterns + sign-in      |----->| queries (SQL.DB_* alert |
- | Deploy-SqlPaas.ps1        |        | anomalies               |      | types instead of VM_*)  |
- +---------------------------+        | (simulator binary does  |      +-------------------------+
-                                      |  NOT apply to PaaS)     |
+ | Option C: Azure SQL DB    |        | Run-PaasSimulations.ps1 |      | Same Sentinel / XDR     |
+ | (PaaS)                    |------->| drives 5 client-side    |----->| queries (SQL.DB_* alert |
+ | Deploy-SqlPaas.ps1        |        | scenarios via ADO.NET:  |      | types instead of VM_*)  |
+ +---------------------------+        |  - BruteForce     (HIGH)|      +-------------------------+
+                                      |  - SqlInjection   (MED) |
+                                      |  - SuspiciousApp  (MED) |
+                                      |  - ShellAccess    (LOW) |
+                                      |  - DataExfil      (LOW) |
                                       +-------------------------+
 ```
 
@@ -51,7 +54,7 @@ In ~15 minutes (simulator track) you can:
 - ✅ Drives the **official Microsoft simulator binary** (`Microsoft.SQL.ADS.DefenderForSQL.exe`) — the same binary the "Simulate alert" button in the Azure portal invokes — for both **SQL on Azure VM** and **Arc-enabled SQL Server**.
 - ✅ Repeatable: deploy → bootstrap → run-all → query KQL → cleanup.
 - ❌ Not a homegrown attack toolkit. We do not ship `Invoke-SqlInjection`-style scripts; Defender for SQL only raises alerts from its own simulator + the underlying telemetry it recognises.
-- ⚠️ **The simulator binary does not exist on Azure SQL Database (PaaS).** [`Simulate alerts for Defender for SQL servers on machines`](https://learn.microsoft.com/en-us/azure/defender-for-cloud/simulate-alerts-sql-machines) explicitly targets the machines plan (IaaS + Arc). PaaS alert generation is a separate track — see [Azure SQL Database (PaaS) track](#azure-sql-database-paas-track) below.
+- ⚠️ **The simulator binary does not exist on Azure SQL Database (PaaS).** [`Simulate alerts for Defender for SQL servers on machines`](https://learn.microsoft.com/en-us/azure/defender-for-cloud/simulate-alerts-sql-machines) explicitly targets the machines plan (IaaS + Arc). PaaS alerts are triggered via client-side patterns — see [Azure SQL Database (PaaS) track](#azure-sql-database-paas-track) below.
 
 ## Repository layout
 
@@ -67,7 +70,8 @@ defender-sql-testing/
 ├── arc-enabled/                        # SIMULATOR TRACK: Arc-connected SQL Servers (on-prem / nested Hyper-V)
 ├── simulations/
 │   ├── Initialize-SqlLogins.ps1        # Bootstraps SQL logins via single-user mode (machines track)
-│   └── Run-AllSimulations.ps1          # Runs all 7 simulator scenarios via Invoke-AzVMRunCommand
+│   ├── Run-AllSimulations.ps1          # Runs all 7 simulator scenarios via Invoke-AzVMRunCommand (IaaS/Arc)
+│   └── Run-PaasSimulations.ps1         # Client-side alert simulation for Azure SQL Database (PaaS)
 ├── kql/
 │   ├── sentinel/                       # KQL for Sentinel / Log Analytics (SecurityAlert)
 │   └── xdr/                            # KQL for Defender XDR Advanced Hunting (AlertInfo)
@@ -222,30 +226,68 @@ For testing Defender for SQL on **Arc-connected machines** (simulating on-prem /
 
 ## Azure SQL Database (PaaS) track
 
-> **Status: in progress.** The on-machine simulator does not work for PaaS. This section will be expanded with a working alert-generation script.
+The on-machine simulator binary does not exist for PaaS. Instead, [`simulations/Run-PaasSimulations.ps1`](simulations/Run-PaasSimulations.ps1) triggers alerts by sending suspicious activity patterns from your workstation via ADO.NET connections.
 
-[Microsoft's machines-simulator doc](https://learn.microsoft.com/en-us/azure/defender-for-cloud/simulate-alerts-sql-machines) only covers IaaS + Arc. For **Azure SQL Database**, alerts come from **Microsoft Defender for Azure SQL Databases** (a separate plan) and must be triggered by exercising the detection patterns from a SQL client — there is no in-database binary to invoke.
+[Microsoft's machines-simulator doc](https://learn.microsoft.com/en-us/azure/defender-for-cloud/simulate-alerts-sql-machines) only covers IaaS + Arc. For **Azure SQL Database**, alerts come from **Microsoft Defender for Azure SQL Databases** (a separate plan) and are triggered by client-side query/login patterns.
 
-Defender for Azure SQL Database alert families (alert types start with `SQL.DB_*`):
+### PaaS alert scenarios
 
-| Alert family                         | How to trigger from a client |
-|--------------------------------------|------------------------------|
-| `SQL.DB_BruteForce`                  | Many failed logins from one IP in a short window. |
-| `SQL.DB_PotentialSqlInjection`       | Execute queries containing classic injection patterns (e.g. `' OR 1=1 --`, `; DROP TABLE`, `UNION SELECT NULL,...`). |
-| `SQL.DB_VulnerabilityToSqlInjection` | Run application-style queries that produce SQL errors revealing unsanitised input. |
-| `SQL.DB_HarmfulApplication`          | Connect with a client `Application Name` matching a known offensive tool (e.g. `sqlmap`, `Havij`). |
-| `SQL.DB_PrincipalAnomaly`            | Sign in as a SQL login that has never been used before. |
-| `SQL.DB_GeoAnomaly` / `_DomainAnomaly` / `_DataCenterAnomaly` | Sign in from an IP/region the workload has not been accessed from before (e.g. via a VPN). |
-| `SQL.DB_SuspiciousIpAnomaly`         | Sign in from an IP flagged on Microsoft Threat Intelligence feeds. |
-| `SQL.DB_DataExfiltrationAnomaly`     | Issue a `SELECT` that returns substantially more rows/bytes than the workload's baseline. |
+| Scenario | Expected Alert | Confidence | What the script does |
+|----------|---------------|------------|---------------------|
+| `BruteForce` | `SQL.DB_BruteForce` | **High** | Rapid failed login attempts with wrong passwords, followed by one successful login |
+| `SqlInjection` | `SQL.DB_PotentialSqlInjection` | **Medium** | Executes queries with UNION, OR 1=1, WAITFOR, dynamic SQL patterns |
+| `SuspiciousApp` | `SQL.DB_HarmfulApplication` | **Medium** | Connects with known attack tool names (sqlmap, havij, etc.) |
+| `ShellAccess` | `SQL.DB_ShellExternalSourceAnomaly` | **Low** | Attempts xp_cmdshell, OPENROWSET (blocked on PaaS, but attempt is logged) |
+| `DataExfiltration` | Anomaly-based | **Low** | Bulk SELECT patterns; works better on databases with usage baselines |
+
+> **Important:** PaaS detection is behavioral and baseline-driven. Alerts are **not guaranteed** and may take 5-60 minutes to appear. `BruteForce` is the most reliable trigger.
+
+### 1. Deploy an Azure SQL Database
+
+```powershell
+$adminPwd = Read-Host 'SQL admin password' -AsSecureString
+.\infrastructure\powershell\Deploy-SqlPaas.ps1 `
+    -ResourceGroupName 'rg-defender-sql-paas' `
+    -Location          'eastus' `
+    -ServerName        'yourserver' `
+    -AdminUsername     'sqladmin' `
+    -AdminPassword     $adminPwd
+```
+
+### 2. Run PaaS simulations
+
+```powershell
+.\simulations\Run-PaasSimulations.ps1 `
+    -ServerName  'yourserver' `
+    -SqlUser     'sqladmin' `
+    -SqlPassword '<YourPassword>'
+```
+
+Run a subset or tune brute-force intensity:
+
+```powershell
+.\simulations\Run-PaasSimulations.ps1 `
+    -ServerName 'yourserver' -SqlUser 'sqladmin' -SqlPassword '<YourPassword>' `
+    -Attacks BruteForce,SqlInjection -BruteForceAttempts 100
+```
+
+Seed test data for the DataExfiltration scenario:
+
+```powershell
+.\simulations\Run-PaasSimulations.ps1 `
+    -ServerName 'yourserver' -SqlUser 'sqladmin' -SqlPassword '<YourPassword>' `
+    -Attacks DataExfiltration -SeedExfiltrationData
+```
+
+### 3. Verify alerts (allow 5-60 min for PaaS)
+
+Use the same KQL queries under [`kql/sentinel/`](kql/sentinel/) and [`kql/xdr/`](kql/xdr/). PaaS alerts use `SQL.DB_*` alert type prefixes instead of `SQL.VM_*`.
 
 **Prerequisites for the PaaS track:**
 
 1. Deploy via [`infrastructure/powershell/Deploy-SqlPaas.ps1`](infrastructure/powershell/Deploy-SqlPaas.ps1).
 2. Enable **Microsoft Defender for Azure SQL Databases** on the logical server (or via the subscription-level pricing plan `SqlServers`).
-3. Allow your client IP through the server firewall (or use a private endpoint + jump box).
-
-A PaaS-equivalent of `Run-AllSimulations.ps1` (driving `sqlcmd`/`Invoke-Sqlcmd` from your workstation against the public endpoint) is on the roadmap. Open an issue or ping the maintainer if you need it sooner.
+3. Allow your client IP through the server firewall (the deploy script does this automatically).
 
 See also: [Defender for Azure SQL alerts reference](https://learn.microsoft.com/en-us/azure/defender-for-cloud/alerts-sql-database-and-azure-synapse-analytics).
 
